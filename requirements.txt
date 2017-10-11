@@ -1,0 +1,4 @@
+# Included because many Paas's require a requirements.txt file in the project root
+# Just installs the production requirements.
+-r requirements/dev.txt
+# -r requirements/prod.txt
