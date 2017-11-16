@@ -23,3 +23,6 @@ pyramid $ python3 -m venv ENV
 ```
 
 ### For Deployment (Heroku)
+
+
+Sources: http://blog.luisrei.com/articles/flaskrest.html

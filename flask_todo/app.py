@@ -1,7 +1,10 @@
 """Entire flask app."""
-from flask import Flask
+from datetime import datetime
+from flask import Flask, jsonify, request, g
 from flask_sqlalchemy import SQLAlchemy
+from functools import wraps
 import os
+from passlib.hash import pbkdf2_sha256 as hasher
 
 
 app = Flask(__name__)
@@ -18,8 +21,8 @@ class Task(db.Model):
     creation_date = db.Column(db.DateTime, nullable=False)
     due_date = db.Column(db.DateTime)
     completed = db.Column(db.Boolean, default=False)
-    profile_id = db.Column(db.Integer, db.ForeignKey('profiles.id'), nullable=False)
-    profile = db.relationship("Profile", back_populates='tasks')
+    # profile_id = db.Column(db.Integer, db.ForeignKey('profiles.id'), nullable=False)
+    # profile = db.relationship("Profile", back_populates='tasks')
 
     def to_dict(self):
         return {
@@ -42,7 +45,7 @@ class Profile(db.Model):
     email = db.Column(db.Unicode, nullable=False)
     password = db.Column(db.Unicode, nullable=False)
     date_joined = db.Column(db.DateTime, nullable=False)
-    tasks = db.relationship("Task", back_populates='profile')
+    # tasks = db.relationship("Task", back_populates='profile')
 
     def to_dict(self):
         """Get the object's properties as a dictionary."""
@@ -61,28 +64,113 @@ class Profile(db.Model):
 
 @app.route('/api/v1')
 def index():
-    pass
+    """List of routes for this API."""
+    output = {
+        'info': 'GET /api/v1',
+        'register': 'POST /api/v1/accounts',
+        'single profile detail': 'GET /api/v1/accounts/<username>',
+        'edit profile': 'PUT /api/v1/accounts/<username>',
+        'delete profile': 'DELETE /api/v1/accounts/<username>',
+        'login': 'POST /api/v1/accounts/login',
+        'logout': 'GET /api/v1/accounts/logout',
+        "user's tasks": 'GET /api/v1/accounts/<username>/tasks',
+        "create task": 'POST /api/v1/accounts/<username>/tasks',
+        "task detail": 'GET /api/v1/accounts/<username>/tasks/<id>',
+        "task update": 'PUT /api/v1/accounts/<username>/tasks/<id>',
+        "delete task": 'DELETE /api/v1/accounts/<username>/tasks/<id>'
+    }
+    response = jsonify(output)
+    import pdb; pdb.set_trace()
+    return response
 
-@app.route('/api/v1/accounts')
-def index():
-    pass
 
-@app.route('/api/v1/accounts/login')
-def index():
-    pass
+def get_profile(username):
+    """Check if the requested profile exists."""
+    return Profile.query.filter_by(username=username).first()
 
-@app.route('/api/v1/accounts/logout')
-def index():
-    pass
 
-@app.route('/api/v1/accounts/<username>')
-def index():
-    pass
+def check_auth(username, password):
+    return True
+    profile = get_profile(username)
+    return profile and hasher.verify(password, profile.password)
 
-@app.route('/api/v1/accounts/<username>/tasks')
-def index():
-    pass
 
-@app.route('/api/v1/accounts/<username>/tasks/<id:\d+>')
-def index():
-    pass
+def authenticate():
+    message = {'error': 'You do not have permission to access this data.'}
+    resp = jsonify(message)
+
+    resp.status_code = 403
+    resp.headers['WWW-Authenticate'] = 'Basic realm="Example"'
+
+    return resp
+
+
+def requires_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth = request.authorization
+        if not auth: 
+            return authenticate()
+
+        elif not check_auth(auth.username, auth.password):
+            return authenticate()
+        return f(*args, **kwargs)
+
+    return decorated
+
+
+@app.route('/api/v1/accounts', methods=['POST'])
+def register():
+    """Add a new user profile if it doesn't already exist."""
+    needed = ['username', 'email', 'password', 'password2']
+    if all([key in request.form for key in needed]):
+        username = request.form['username']
+        profile = get_profile(username)
+        if not profile:
+            if request.form['password'] == request.form['password2']:
+                new_profile = Profile(
+                    username=username,
+                    email=request.form['email'],
+                    password=hasher.hash(request.form['password']),
+                    date_joined=datetime.now(),
+                )
+                db.session.add(new_profile)
+                db.session.commit()
+
+                headers = remember(request, username)
+                response = jsonify({"msg": 'Profile created'})
+                response.status_code = 201
+                response.headers.extend(headers)
+                return response
+
+            response = jsonify({"error": "Passwords don't match"})
+            response.status_code = 400
+            return response
+
+        response = jsonify({'error': f'Username "{username}" is already taken'})
+        response.status_code = 400
+        return response
+
+    response = jsonify({'error': 'Some fields are missing'})
+    response.status_code = 400
+    return response
+
+# @app.route('/api/v1/accounts/login')
+# def index():
+#     pass
+
+# @app.route('/api/v1/accounts/logout')
+# def index():
+#     pass
+
+# @app.route('/api/v1/accounts/<username>')
+# def index(username):
+#     pass
+
+# @app.route('/api/v1/accounts/<username>/tasks')
+# def index(username):
+#     pass
+
+# @app.route('/api/v1/accounts/<username>/tasks/<task_id:\d+>')
+# def index(username, task_id):
+#     pass
