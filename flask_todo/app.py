@@ -4,9 +4,9 @@ from flask import Flask, jsonify, request, Response
 from flask_sqlalchemy import SQLAlchemy
 from flask_httpauth import HTTPTokenAuth
 from functools import wraps
+import json
 import os
 from passlib.hash import pbkdf2_sha256 as hasher
-import json
 import secrets
 
 
@@ -151,17 +151,48 @@ def register():
     response.status_code = 400
     return response
 
-# @app.route('/api/v1/accounts/login')
-# def index():
-#     pass
 
-# @app.route('/api/v1/accounts/logout')
-# def index():
-#     pass
+@app.route('/api/v1/accounts/login', methods=['POST'])
+def login():
+    """Authenticate a user."""
+    needed = ['username', 'password']
+    if all([key in request.forms for key in needed]):
+        profile = get_profile(request.forms['username'])
+        if profile and hasher.verify(request.forms['password'], profile.password):
+            response = Response(
+                response=json.dumps({'msg': 'Authenticated'}),
+                mimetype="application/json",
+                status=200
+            )
+            return authenticate(response, profile)
+        response.status_code = 400
+        return {'error': 'Incorrect username/password combination.'}
+    response.status_code = 400
+    return {'error': 'Some fields are missing'}
 
-# @app.route('/api/v1/accounts/<username>')
-# def index(username):
-#     pass
+
+@app.route('/api/v1/accounts/logout')
+def logout():
+    """Log a user out."""
+    return jsonify({'msg': 'Logged out.'})
+
+
+@app.route('/api/v1/accounts/<username>')
+@auth.login_required
+def profile_detail(username):
+    profile = get_profile(username)
+    if profile:
+        response = Response(
+            mimetype="application/json",
+            response=json.dumps(profile.to_dict()),
+        )
+        return authenticate(response, profile)
+    response = Response(
+        mimetype="application/json",
+        response=json.dumps({'error': 'You do not have permission to access this profile.'}),
+        status=403
+    )
+    return response
 
 # @app.route('/api/v1/accounts/<username>/tasks')
 # def index(username):

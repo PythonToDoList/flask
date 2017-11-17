@@ -28,3 +28,5 @@ pyramid $ python3 -m venv ENV
 Sources:
     - http://blog.luisrei.com/articles/flaskrest.html
     - http://flask-httpauth.readthedocs.io/en/latest/
+    - https://stackoverflow.com/questions/13825278/python-request-with-authentication-access-token
+    - http://flask.pocoo.org/snippets/30/
