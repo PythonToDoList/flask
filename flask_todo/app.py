@@ -1,14 +1,18 @@
 """Entire flask app."""
 from datetime import datetime
-from flask import Flask, jsonify, request, g
+from flask import Flask, jsonify, request, Response
 from flask_sqlalchemy import SQLAlchemy
+from flask_httpauth import HTTPTokenAuth
 from functools import wraps
 import os
 from passlib.hash import pbkdf2_sha256 as hasher
+import json
+import secrets
 
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', '')
+auth = HTTPTokenAuth(scheme='Token')
 db = SQLAlchemy(app)
 
 DATE_FMT = '%d/%m/%Y %H:%M:%S'
@@ -45,6 +49,7 @@ class Profile(db.Model):
     email = db.Column(db.Unicode, nullable=False)
     password = db.Column(db.Unicode, nullable=False)
     date_joined = db.Column(db.DateTime, nullable=False)
+    token = db.Column(db.Unicode, nullable=False)
     # tasks = db.relationship("Task", back_populates='profile')
 
     def to_dict(self):
@@ -80,7 +85,6 @@ def index():
         "delete task": 'DELETE /api/v1/accounts/<username>/tasks/<id>'
     }
     response = jsonify(output)
-    import pdb; pdb.set_trace()
     return response
 
 
@@ -89,34 +93,24 @@ def get_profile(username):
     return Profile.query.filter_by(username=username).first()
 
 
-def check_auth(username, password):
-    return True
-    profile = get_profile(username)
-    return profile and hasher.verify(password, profile.password)
+@auth.verify_token
+def verify_token(token):
+    if token:
+        username = token.split(':')[0]
+        profile = get_profile(username)
+        return True
 
 
-def authenticate():
-    message = {'error': 'You do not have permission to access this data.'}
-    resp = jsonify(message)
-
-    resp.status_code = 403
-    resp.headers['WWW-Authenticate'] = 'Basic realm="Example"'
-
-    return resp
+def authenticate(response, profile):
+    token = f'{profile.username}:{profile.token}'
+    response.set_cookie('auth_token', value=token)
+    return response
 
 
-def requires_auth(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        auth = request.authorization
-        if not auth: 
-            return authenticate()
-
-        elif not check_auth(auth.username, auth.password):
-            return authenticate()
-        return f(*args, **kwargs)
-
-    return decorated
+@app.route('/secret')
+@auth.login_required
+def secret():
+    return jsonify({'status': 'success'})
 
 
 @app.route('/api/v1/accounts', methods=['POST'])
@@ -133,15 +127,17 @@ def register():
                     email=request.form['email'],
                     password=hasher.hash(request.form['password']),
                     date_joined=datetime.now(),
+                    token=secrets.token_urlsafe(64)
                 )
                 db.session.add(new_profile)
                 db.session.commit()
 
-                headers = remember(request, username)
-                response = jsonify({"msg": 'Profile created'})
-                response.status_code = 201
-                response.headers.extend(headers)
-                return response
+                response = Response(
+                    response=json.dumps({"msg": 'Profile created'}),
+                    status=201,
+                    mimetype="application/json"
+                )
+                return authenticate(response, new_profile)
 
             response = jsonify({"error": "Passwords don't match"})
             response.status_code = 400

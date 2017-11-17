@@ -4,6 +4,7 @@ from setuptools import setup, find_packages
 requires = [
     'flask',
     'flask-sqlalchemy',
+    'flask-httpauth',
     'psycopg2',
     'passlib'
 ]
