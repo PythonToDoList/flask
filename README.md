@@ -58,3 +58,4 @@ Sources:
     - http://flask-httpauth.readthedocs.io/en/latest/
     - https://stackoverflow.com/questions/13825278/python-request-with-authentication-access-token
     - http://flask.pocoo.org/snippets/30/
+    - http://exploreflask.com/en/latest/preface.html
