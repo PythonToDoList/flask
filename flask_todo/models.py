@@ -1,4 +1,6 @@
 from .app import db
+from datetime import datetime
+import secrets
 
 
 DATE_FMT = '%d/%m/%Y %H:%M:%S'
@@ -12,6 +14,7 @@ class Task(db.Model):
     due_date = db.Column(db.DateTime)
     completed = db.Column(db.Boolean, default=False)
     profile_id = db.Column(db.Integer, db.ForeignKey('profile.id'), nullable=False)
+    profile = db.relationship("Profile", back_populates='tasks')
 
     def to_dict(self):
         return {
@@ -36,6 +39,11 @@ class Profile(db.Model):
     date_joined = db.Column(db.DateTime, nullable=False)
     token = db.Column(db.Unicode, nullable=False)
     tasks = db.relationship("Task", back_populates='profile', lazy=True)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.date_joined = datetime.now()
+        self.token = secrets.token_urlsafe(64)
 
     def to_dict(self):
         """Get the object's properties as a dictionary."""
