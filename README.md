@@ -19,8 +19,8 @@ $ git clone https://github.com/PythonToDoList/flask.git
 Move into the cloned directory and start a new Python 3 [virtual environment](https://docs.python.org/3/tutorial/venv.html). You should be using Python 3.6 or later.
 
 ```
-$ cd pyramid
-pyramid $ python3 -m venv ENV
+$ cd flask
+flask $ python3 -m venv ENV
 (ENV) flask $ source ENV/bin/activate
 ```
 
